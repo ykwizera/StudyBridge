@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  DATA_MANAGER
+  DATA_COLLECTOR
+  ANALYST
+}
+
+enum RecordingStage {
+  UPLOADED
+  TRANSCRIBING
+  TRANSLATING
+  COMPLETED
+}
+
+enum TaskType {
+  TRANSCRIPTION
+  TRANSLATION
+}
+
+enum TaskStatus {
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  RETURNED
+}
+
+model User {
+  id                 String          @id @default(cuid())
+  email              String          @unique
+  name               String
+  passwordHash       String
+  role               Role
+  isActive           Boolean         @default(true)
+  mustChangePassword Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  sessions           Session[]
+  memberships        ProjectMember[]
+}
+
+model Session {
+  id        String   @id // SHA-256 hash of the cookie token
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  ip        String?
+  userAgent String?
+
+  @@index([userId])
+}
+
+model Hospital {
+  id         String      @id @default(cuid())
+  name       String
+  code       String      @unique
+  isActive   Boolean     @default(true)
+  recordings Recording[]
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  title       String
+  description String?
+  createdById String
+  createdAt   DateTime        @default(now())
+  members     ProjectMember[]
+  recordings  Recording[]
+  grants      AnalystGrant[]
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+}
+
+model Recording {
+  id             String         @id @default(cuid())
+  referenceCode  String         @unique // random, never sequential
+  projectId      String
+  hospitalId     String
+  interviewLabel String
+  uploadedById   String
+  objectKey      String         @unique // random key, no identifying filename
+  mimeType       String
+  sizeBytes      BigInt
+  checksum       String?
+  stage          RecordingStage @default(UPLOADED)
+  createdAt      DateTime       @default(now())
+  project        Project        @relation(fields: [projectId], references: [id])
+  hospital       Hospital       @relation(fields: [hospitalId], references: [id])
+  tasks          Task[]
+}
+
+model Task {
+  id             String         @id @default(cuid())
+  recordingId    String
+  type           TaskType
+  assigneeId     String
+  assignedById   String
+  status         TaskStatus     @default(ASSIGNED)
+  dueDate        DateTime?
+  content        String?
+  submittedAt    DateTime?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  reviewNote     String?
+  adminOverride  Boolean        @default(false)
+  overrideReason String?
+  recording      Recording      @relation(fields: [recordingId], references: [id])
+  revisions      TaskRevision[]
+
+  @@unique([recordingId, type])
+}
+
+model TaskRevision {
+  id          String   @id @default(cuid())
+  taskId      String
+  version     Int
+  content     String
+  createdById String
+  createdAt   DateTime @default(now())
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, version])
+}
+
+model AnalystGrant {
+  id                     String    @id @default(cuid())
+  analystId              String
+  projectId              String
+  canDownloadAudio       Boolean   @default(false)
+  canDownloadTranscript  Boolean   @default(false)
+  canDownloadTranslation Boolean   @default(false)
+  grantedById            String
+  revokedAt              DateTime?
+  project                Project   @relation(fields: [projectId], references: [id])
+
+  @@unique([analystId, projectId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}
