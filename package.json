@@ -1,11 +1,14 @@
 {
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "@tailwindcss/vite": "^4.3.5",
     "argon2": "^0.45.2",
     "cookie-parser": "^1.4.7",
     "express-rate-limit": "^8.7.4",
     "helmet": "^8.3.0",
     "prisma": "^6.19.3",
+    "react-router-dom": "^7.18.5",
+    "tailwindcss": "^4.3.5",
     "zod": "^4.6.7"
   },
   "scripts": {
